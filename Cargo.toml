@@ -11,7 +11,6 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-bytemuck = "1.21.0"
 libm = "0.2.15"
 
 [dev-dependencies]

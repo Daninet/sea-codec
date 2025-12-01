@@ -1,10 +1,12 @@
-use bytemuck::cast_slice;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use sea_codec::{
     decoder::SeaDecoder,
     encoder::{EncoderSettings, SeaEncoder},
 };
-use std::{io::Cursor, path::Path};
+use std::{
+    io::{Read, Write},
+    path::Path,
+};
 use wav::{read_wav, write_wav};
 
 #[path = "../tests/wav.rs"]
@@ -163,26 +165,29 @@ fn main() {
                 std::process::exit(1);
             });
 
-            let u8_input_samples: &[u8] = cast_slice(&input_wave.samples);
-            let mut cursor: Cursor<_> = Cursor::new(u8_input_samples);
-
-            let mut sea_encoder = SeaEncoder::new(
+            let mut sea_encoder = SeaEncoder::from_slice(
                 input_wave.channels as u8,
                 input_wave.sample_rate,
                 Some(input_wave.samples.len() as u32 / input_wave.channels),
                 settings,
-                &mut cursor,
-                &mut output_file,
+                &input_wave.samples,
             )
             .unwrap_or_else(|_| {
                 eprintln!("Error: Failed to create encoder");
                 std::process::exit(1);
             });
 
-            while sea_encoder.encode_frame().unwrap_or_else(|_| {
+            let mut buf = Vec::new();
+            while sea_encoder.encode_frame(&mut buf).unwrap_or_else(|_| {
                 eprintln!("Error: Failed to encode frame");
                 std::process::exit(1);
-            }) {}
+            }) {
+                output_file.write_all(&buf).unwrap_or_else(|_| {
+                    eprintln!("Error: Failed to write to output file");
+                    std::process::exit(1);
+                });
+                buf.clear();
+            }
 
             sea_encoder.finalize().unwrap_or_else(|_| {
                 eprintln!("Error: Failed to finalize encoder");
@@ -195,28 +200,31 @@ fn main() {
                 std::process::exit(1);
             });
 
-            let mut sea_decoded = Vec::<u8>::with_capacity(64 * 1024 * 1024);
-            let mut sea_decoder = SeaDecoder::new(&mut input_file, &mut sea_decoded).unwrap();
+            let mut content = Vec::new();
+            input_file.read_to_end(&mut content).unwrap();
 
-            while sea_decoder.decode_frame().unwrap_or_else(|_| {
+            let mut sea_decoded = Vec::<i16>::with_capacity(64 * 1024 * 1024);
+            let mut sea_decoder = SeaDecoder::from_slice(&content).unwrap();
+
+            while let Some(buf) = sea_decoder.decode_frame().unwrap_or_else(|_| {
                 eprintln!("Error: Failed to decode frame");
                 std::process::exit(1);
-            }) {}
-
-            sea_decoder.finalize().unwrap_or_else(|_| {
-                eprintln!("Error: Failed to finalize decoder");
-                std::process::exit(1);
-            });
+            }) {
+                sea_decoded.extend_from_slice(&buf);
+            }
 
             let info = sea_decoder.get_header();
-            let i16_decoded: &[i16] = cast_slice(&sea_decoded);
 
-            write_wav(i16_decoded, info.channels as u16, info.sample_rate, output).unwrap_or_else(
-                |_| {
-                    eprintln!("Error: Failed to encode wav file");
-                    std::process::exit(1);
-                },
-            );
+            write_wav(
+                sea_decoded.as_slice(),
+                info.channels as u16,
+                info.sample_rate,
+                output,
+            )
+            .unwrap_or_else(|_| {
+                eprintln!("Error: Failed to encode wav file");
+                std::process::exit(1);
+            });
         }
         _ => {
             eprintln!("Error: Invalid file extensions. Supported conversions are .wav to .sea and .sea to .wav");
