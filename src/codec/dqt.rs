@@ -1,4 +1,7 @@
-use std::array;
+use core::array;
+
+use alloc::vec;
+use alloc::vec::Vec;
 
 #[derive(Debug, PartialEq)]
 pub struct SeaDequantTab {
@@ -47,7 +50,7 @@ impl SeaDequantTab {
 
         let scale_factor_items = 1 << scale_factor_bits;
         for index in 1..=scale_factor_items {
-            let value: f32 = (index as f32).powf(power_factor);
+            let value: f32 = libm::powf(index as f32, power_factor);
             output.push(value as i32);
         }
 
@@ -83,7 +86,7 @@ impl SeaDequantTab {
         let steps = 1 << (residual_bits - 1);
         let end = ((1 << residual_bits) - 1) as f32;
         let step = (end - start) / (steps - 1) as f32;
-        let step_floor = step.floor();
+        let step_floor = libm::floorf(step);
 
         let mut curve = vec![0.0; steps];
         for (i, item) in curve.iter_mut().enumerate().take(steps).skip(1) {
@@ -116,7 +119,7 @@ impl SeaDequantTab {
 
             // zig zag pattern decreases quantization error
             for item in dqt.iter().take(dqt_items) {
-                let val = (scale_factors[s] as f32 * item).round() as i32;
+                let val = libm::roundf(scale_factors[s] as f32 * item) as i32;
                 output[s].push(val);
                 output[s].push(-val);
             }

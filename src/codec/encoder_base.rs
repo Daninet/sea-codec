@@ -1,4 +1,7 @@
-use std::mem;
+use core::mem;
+
+use alloc::vec;
+use alloc::vec::Vec;
 
 use super::{
     common::{clamp_i16, SeaResidualSize},

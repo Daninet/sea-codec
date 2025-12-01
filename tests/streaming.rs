@@ -1,10 +1,9 @@
 use std::{
     cell::RefCell,
-    io::{self, Cursor, Read, Write},
+    io::{self, Read, Write},
     rc::Rc,
 };
 
-use bytemuck::cast_slice;
 use helpers::{encode_decode, gen_test_signal, TEST_SAMPLE_RATE};
 use sea_codec::{
     decoder::SeaDecoder,
@@ -48,6 +47,7 @@ impl Read for SharedBuffer {
     }
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn streaming() {
     let channels = 1;
@@ -60,38 +60,33 @@ fn streaming() {
         EncoderSettings::default(),
     );
 
-    let u8_input_samples: &[u8] = cast_slice(&input_samples);
-    let mut input_cursor: Cursor<_> = Cursor::new(u8_input_samples);
-
     let sea_encoded = SharedBuffer::new(input_samples.len());
     let mut sea_encoded_clone = sea_encoded.clone();
 
-    let mut sea_encoder = SeaEncoder::new(
+    let mut sea_encoder = SeaEncoder::from_slice(
         channels as u8,
         TEST_SAMPLE_RATE,
         None,
         EncoderSettings::default(),
-        &mut input_cursor,
-        &mut sea_encoded_clone,
+        &input_samples,
     )
     .unwrap();
 
     // need to encode first frame to get the header
-    sea_encoder.encode_frame().unwrap();
+    sea_encoder.encode_frame(&mut sea_encoded_clone).unwrap();
 
-    let mut sea_decoded = Vec::<u8>::with_capacity(input_samples.len() * 2);
+    let mut sea_decoded = Vec::<i16>::with_capacity(input_samples.len() * 2);
     let sea_encoded_dec_clone = sea_encoded.clone();
-    let mut sea_decoder = SeaDecoder::new(sea_encoded_dec_clone, &mut sea_decoded).unwrap();
+    let mut sea_decoder = SeaDecoder::from_reader(sea_encoded_dec_clone).unwrap();
 
     for _ in 0..3 {
-        sea_encoder.encode_frame().unwrap();
-        sea_decoder.decode_frame().unwrap();
+        sea_encoder.encode_frame(&mut sea_encoded_clone).unwrap();
+        sea_decoder.decode_frame(&mut sea_decoded).unwrap();
     }
 
-    let i16_sea_decoded: &[i16] = cast_slice(&sea_decoded);
-    assert!(!i16_sea_decoded.is_empty());
+    assert!(!sea_decoded.is_empty());
     assert_eq!(
-        reference_samples.decoded[..i16_sea_decoded.len()],
-        i16_sea_decoded[..]
+        reference_samples.decoded[..sea_decoded.len()],
+        sea_decoded[..]
     );
 }

@@ -1,4 +1,7 @@
-use std::mem;
+use core::mem;
+
+use alloc::vec;
+use alloc::vec::Vec;
 
 pub struct BitUnpacker {
     bits_stored: u32,

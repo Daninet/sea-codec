@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 pub const LMS_LEN: usize = 4;
 
 #[derive(Debug, Clone)]

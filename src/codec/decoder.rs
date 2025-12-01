@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use super::{chunk::SeaChunk, common::clamp_i16, dqt::SeaDequantTab};
 
 pub struct Decoder {
@@ -17,10 +19,10 @@ impl Decoder {
         }
     }
 
-    pub fn decode_cbr(&self, chunk: &SeaChunk) -> Vec<i16> {
+    pub fn decode_cbr(&self, chunk: &SeaChunk, output: &mut Vec<i16>) {
         assert_eq!(chunk.scale_factor_bits as usize, self.scale_factor_bits);
 
-        let mut output: Vec<i16> = Vec::with_capacity(chunk.frames_per_chunk * self.channels);
+        output.reserve(chunk.frames_per_chunk * self.channels);
 
         let mut lms = chunk.lms.clone();
 
@@ -45,14 +47,12 @@ impl Decoder {
                 }
             }
         }
-
-        output
     }
 
-    pub fn decode_vbr(&self, chunk: &SeaChunk) -> Vec<i16> {
+    pub fn decode_vbr(&self, chunk: &SeaChunk, output: &mut Vec<i16>) {
         assert_eq!(chunk.scale_factor_bits as usize, self.scale_factor_bits);
 
-        let mut output: Vec<i16> = Vec::with_capacity(chunk.frames_per_chunk * self.channels);
+        output.reserve(chunk.frames_per_chunk * self.channels);
 
         let mut lms = chunk.lms.clone();
 
@@ -81,7 +81,5 @@ impl Decoder {
                 }
             }
         }
-
-        output
     }
 }
