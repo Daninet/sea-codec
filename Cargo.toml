@@ -1,6 +1,6 @@
 [package]
 name = "sea-codec"
-version = "0.5.3"
+version = "0.6.0"
 description = "Low-complexity, lossy audio codec designed for embedded devices"
 homepage = "https://github.com/Daninet/sea-codec"
 repository = "https://github.com/Daninet/sea-codec"
