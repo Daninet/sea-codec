@@ -81,7 +81,7 @@ fn streaming() {
 
     for _ in 0..3 {
         sea_encoder.encode_frame(&mut sea_encoded_clone).unwrap();
-        sea_decoded.extend_from_slice(sea_decoder.decode_frame().unwrap().unwrap().as_slice());
+        sea_decoder.decode_frame(&mut sea_decoded).unwrap();
     }
 
     assert!(!sea_decoded.is_empty());

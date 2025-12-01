@@ -40,11 +40,11 @@ impl<'inp> SeaDecoder<'inp> {
         })
     }
 
-    pub fn decode_frame(&mut self) -> Result<Option<Vec<i16>>, SeaError> {
+    pub fn decode_frame(&mut self, result: &mut Vec<i16>) -> Result<bool, SeaError> {
         if self.file.header.total_frames != 0
             && (self.file.header.total_frames as usize) <= self.frames_read
         {
-            return Ok(None);
+            return Ok(false);
         }
 
         let remaining_frames = if self.file.header.total_frames > 0 {
@@ -60,9 +60,10 @@ impl<'inp> SeaDecoder<'inp> {
         match reader_res {
             Some(samples) => {
                 self.frames_read += samples.len() / self.file.header.channels as usize;
-                Ok(Some(samples))
+                result.extend_from_slice(samples.as_slice());
+                Ok(true)
             }
-            None => Ok(None),
+            None => Ok(false),
         }
     }
 

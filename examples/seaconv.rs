@@ -206,12 +206,13 @@ fn main() {
             let mut sea_decoded = Vec::<i16>::with_capacity(64 * 1024 * 1024);
             let mut sea_decoder = SeaDecoder::from_slice(&content).unwrap();
 
-            while let Some(buf) = sea_decoder.decode_frame().unwrap_or_else(|_| {
-                eprintln!("Error: Failed to decode frame");
-                std::process::exit(1);
-            }) {
-                sea_decoded.extend_from_slice(&buf);
-            }
+            while sea_decoder
+                .decode_frame(&mut sea_decoded)
+                .unwrap_or_else(|_| {
+                    eprintln!("Error: Failed to decode frame");
+                    std::process::exit(1);
+                })
+            {}
 
             let info = sea_decoder.get_header();
 

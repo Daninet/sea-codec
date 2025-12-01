@@ -46,9 +46,7 @@ pub fn sea_decode(encoded: &[u8]) -> SeaDecodeInfo {
 
     let mut sea_decoder = SeaDecoder::from_slice(encoded).unwrap();
 
-    while let Some(result) = sea_decoder.decode_frame().unwrap() {
-        sea_decoded.extend_from_slice(result.as_slice());
-    }
+    while sea_decoder.decode_frame(&mut sea_decoded).unwrap() {}
 
     let header = sea_decoder.get_header();
 
