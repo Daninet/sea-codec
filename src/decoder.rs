@@ -1,40 +1,50 @@
-use std::io;
+use alloc::vec::Vec;
 
-use bytemuck::cast_slice;
-
-use crate::codec::{
-    common::SeaError,
-    file::{SeaFile, SeaFileHeader},
+use crate::{
+    codec::{
+        common::SeaError,
+        file::{SeaFile, SeaFileHeader},
+    },
+    cursor::Cursor,
 };
 
-pub struct SeaDecoder<R, W> {
-    reader: R,
-    writer: W,
+pub struct SeaDecoder<'inp> {
+    cursor: Cursor<'inp>,
     file: SeaFile,
     frames_read: usize,
 }
 
-impl<R, W> SeaDecoder<R, W>
-where
-    R: io::Read,
-    W: io::Write,
-{
-    pub fn new(mut reader: R, writer: W) -> Result<Self, SeaError> {
-        let file = SeaFile::from_reader(&mut reader)?;
+impl<'inp> SeaDecoder<'inp> {
+    #[cfg(feature = "std")]
+    pub fn from_reader<R: std::io::Read + 'inp>(reader: R) -> Result<Self, SeaError> {
+        let mut cursor = Cursor::from_reader(reader);
+
+        let file = SeaFile::from_reader(&mut cursor)?;
 
         Ok(Self {
-            reader,
-            writer,
+            cursor,
             file,
             frames_read: 0,
         })
     }
 
-    pub fn decode_frame(&mut self) -> Result<bool, SeaError> {
+    pub fn from_slice(data: &'inp [u8]) -> Result<Self, SeaError> {
+        let mut cursor = Cursor::from_slice(data);
+
+        let file = SeaFile::from_reader(&mut cursor)?;
+
+        Ok(Self {
+            cursor,
+            file,
+            frames_read: 0,
+        })
+    }
+
+    pub fn decode_frame(&mut self) -> Result<Option<Vec<i16>>, SeaError> {
         if self.file.header.total_frames != 0
             && (self.file.header.total_frames as usize) <= self.frames_read
         {
-            return Ok(false);
+            return Ok(None);
         }
 
         let remaining_frames = if self.file.header.total_frames > 0 {
@@ -45,26 +55,15 @@ where
 
         let reader_res = self
             .file
-            .samples_from_reader(&mut self.reader, remaining_frames)?;
+            .samples_from_reader(&mut self.cursor, remaining_frames)?;
 
         match reader_res {
             Some(samples) => {
                 self.frames_read += samples.len() / self.file.header.channels as usize;
-                let samples_u8: &[u8] = cast_slice(&samples);
-                self.writer.write_all(samples_u8)?;
-                Ok(true)
+                Ok(Some(samples))
             }
-            None => Ok(false),
+            None => Ok(None),
         }
-    }
-
-    pub fn flush(&mut self) {
-        let _ = self.writer.flush();
-    }
-
-    pub fn finalize(&mut self) -> Result<(), SeaError> {
-        self.writer.flush()?;
-        Ok(())
     }
 
     pub fn get_header(&self) -> SeaFileHeader {

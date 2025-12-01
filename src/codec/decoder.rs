@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use super::{chunk::SeaChunk, common::clamp_i16, dqt::SeaDequantTab};
 
 pub struct Decoder {

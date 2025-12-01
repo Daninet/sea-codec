@@ -1,9 +1,7 @@
-use std::{io, rc::Rc};
-
-use bytemuck::cast_slice;
+use alloc::{rc::Rc, string::String};
 
 use crate::codec::{
-    common::{read_max_or_zero, SeaError},
+    common::SeaError,
     file::{SeaFile, SeaFileHeader},
 };
 
@@ -34,26 +32,40 @@ impl Default for EncoderSettings {
     }
 }
 
-pub struct SeaEncoder<R, W> {
-    reader: R,
-    writer: W,
+trait InternalWrite {
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), SeaError>;
+}
+
+#[cfg(feature = "std")]
+impl<W: std::io::Write> InternalWrite for W {
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), SeaError> {
+        Ok(self.write_all(buf)?)
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl InternalWrite for &mut alloc::vec::Vec<u8> {
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), SeaError> {
+        self.extend_from_slice(buf);
+        Ok(())
+    }
+}
+
+pub struct SeaEncoder<'inp> {
+    data: &'inp [i16],
     file: SeaFile,
     state: SeaEncoderState,
     written_frames: u32,
+    passed_total_frames: Option<u32>,
 }
 
-impl<R, W> SeaEncoder<R, W>
-where
-    R: io::Read,
-    W: io::Write,
-{
-    pub fn new(
+impl<'inp> SeaEncoder<'inp> {
+    pub fn from_slice(
         channels: u8,
         sample_rate: u32,
         total_frames: Option<u32>,
         settings: EncoderSettings,
-        reader: R,
-        mut writer: W,
+        data: &'inp [i16],
     ) -> Result<Self, SeaError> {
         let header = SeaFileHeader {
             version: 1,
@@ -67,45 +79,56 @@ where
 
         let file = SeaFile::new(header, &settings)?;
 
-        let mut state = SeaEncoderState::Start;
-
-        if let Some(total_frames) = total_frames {
-            if total_frames == 0 {
-                writer.write_all(&file.header.serialize())?;
-                state = SeaEncoderState::WritingFrames;
-            }
-        }
+        let state = SeaEncoderState::Start;
 
         Ok(SeaEncoder {
             file,
             state,
-            reader,
-            writer,
+            data,
             written_frames: 0,
+            passed_total_frames: total_frames,
         })
     }
 
-    fn read_samples(&mut self, max_sample_count: usize) -> Result<Vec<i16>, SeaError> {
-        let buffer_size = max_sample_count * std::mem::size_of::<i16>();
-        let buffer = read_max_or_zero(&mut self.reader, buffer_size)?;
+    fn read_samples(&mut self, max_sample_count: usize) -> Result<&'inp [i16], SeaError> {
+        let max_to_read = self.data.len().min(max_sample_count);
 
-        if buffer.is_empty() {
-            return Ok(Vec::new());
+        if max_to_read == 0 {
+            return Ok(&self.data[..0]);
         }
 
-        if buffer.len() % (std::mem::size_of::<i16>() * self.file.header.channels as usize) != 0 {
-            return Err(SeaError::IoError(io::Error::from(
-                io::ErrorKind::UnexpectedEof,
-            )));
+        if !max_to_read.is_multiple_of(self.file.header.channels as usize) {
+            return Err(SeaError::EndOfFile);
         }
 
-        let samples: &[i16] = cast_slice(&buffer);
-        Ok(samples.to_vec())
+        let (samples, new_data) = self.data.split_at(max_to_read);
+        self.data = new_data;
+
+        Ok(samples)
     }
 
-    pub fn encode_frame(&mut self) -> Result<bool, SeaError> {
+    #[cfg(feature = "std")]
+    pub fn encode_frame(&mut self, writer: impl std::io::Write) -> Result<bool, SeaError> {
+        self.encode_frame_inner(writer)
+    }
+
+    #[cfg(not(feature = "std"))]
+    pub fn encode_frame(&mut self, writer: &mut alloc::vec::Vec<u8>) -> Result<bool, SeaError> {
+        self.encode_frame_inner(writer)
+    }
+
+    fn encode_frame_inner<W: InternalWrite>(&mut self, mut writer: W) -> Result<bool, SeaError> {
         if matches!(self.state, SeaEncoderState::Finished) {
             return Err(SeaError::EncoderClosed);
+        }
+
+        if matches!(self.state, SeaEncoderState::Start) {
+            if let Some(total_frames) = self.passed_total_frames {
+                if total_frames == 0 {
+                    writer.write_all(&self.file.header.serialize())?;
+                    self.state = SeaEncoderState::WritingFrames;
+                }
+            }
         }
 
         let channels = self.file.header.channels;
@@ -119,11 +142,11 @@ where
         let full_size_samples =
             self.file.header.frames_per_chunk as usize * self.file.header.channels as usize;
         let samples_to_read = frames * channels as usize;
-        let samples: Vec<i16> = self.read_samples(samples_to_read)?;
+        let samples = self.read_samples(samples_to_read)?;
         let eof: bool = samples.is_empty() || samples.len() < full_size_samples;
 
         if !samples.is_empty() {
-            let encoded_chunk = self.file.make_chunk(&samples)?;
+            let encoded_chunk = self.file.make_chunk(samples)?;
 
             if eof {
                 assert!(encoded_chunk.len() <= self.file.header.chunk_size as usize);
@@ -133,11 +156,11 @@ where
 
             // we need to write file header after the first chunk is generated
             if matches!(self.state, SeaEncoderState::Start) {
-                self.writer.write_all(&self.file.header.serialize())?;
+                writer.write_all(&self.file.header.serialize())?;
                 self.state = SeaEncoderState::WritingFrames;
             }
 
-            self.writer.write_all(&encoded_chunk)?;
+            writer.write_all(&encoded_chunk)?;
             self.written_frames += frames as u32;
         }
 
@@ -148,12 +171,7 @@ where
         Ok(!eof)
     }
 
-    pub fn flush(&mut self) {
-        let _ = self.writer.flush();
-    }
-
     pub fn finalize(&mut self) -> Result<(), SeaError> {
-        self.writer.flush()?;
         self.state = SeaEncoderState::Finished;
         Ok(())
     }

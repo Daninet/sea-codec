@@ -1,3 +1,6 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::{
     codec::{bits::BitUnpacker, lms::LMS_LEN},
     encoder::EncoderSettings,
@@ -57,9 +60,9 @@ impl SeaChunk {
             chunk_type,
             scale_factor_bits: encoder_settings.scale_factor_bits,
             scale_factor_frames: encoder_settings.scale_factor_frames,
-            residual_size: SeaResidualSize::from(encoder_settings.residual_bits.floor() as u8),
+            residual_size: SeaResidualSize::from(libm::floorf(encoder_settings.residual_bits) as u8),
 
-            lms: lms.to_owned(),
+            lms: Vec::from(lms),
             scale_factors,
             vbr_residual_sizes,
             residuals,

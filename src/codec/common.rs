@@ -1,4 +1,7 @@
-use std::io;
+use alloc::vec;
+use alloc::vec::Vec;
+
+use crate::cursor::Cursor;
 
 pub const SEAC_MAGIC: u32 = u32::from_be_bytes(*b"seac"); // 0x73 0x65 0x61 0x63
 
@@ -60,47 +63,50 @@ pub enum SeaError {
     UnsupportedVersion,
     TooManyFrames,
     MetadataTooLarge,
-    IoError(io::Error),
+    EndOfFile,
+    #[cfg(feature = "std")]
+    IoError(std::io::Error),
 }
 
-impl From<io::Error> for SeaError {
-    fn from(error: io::Error) -> Self {
+#[cfg(feature = "std")]
+impl From<std::io::Error> for SeaError {
+    fn from(error: std::io::Error) -> Self {
         SeaError::IoError(error)
     }
 }
 
 #[inline(always)]
-pub fn read_bytes<R: io::Read, const BYTES: usize>(mut reader: R) -> io::Result<[u8; BYTES]> {
+pub fn read_bytes<const BYTES: usize>(reader: &mut Cursor) -> Result<[u8; BYTES], SeaError> {
     let mut buf = [0_u8; BYTES];
     reader.read_exact(&mut buf)?;
     Ok(buf)
 }
 
 #[inline(always)]
-pub fn read_u8<R: io::Read>(reader: R) -> io::Result<u8> {
+pub fn read_u8(reader: &mut Cursor) -> Result<u8, SeaError> {
     let data: [u8; 1] = read_bytes(reader)?;
     Ok(data[0])
 }
 
 #[inline(always)]
-pub fn read_u16_le<R: io::Read>(reader: R) -> io::Result<u16> {
+pub fn read_u16_le(reader: &mut Cursor) -> Result<u16, SeaError> {
     let data = read_bytes(reader)?;
     Ok(u16::from_le_bytes(data))
 }
 
 #[inline(always)]
-pub fn read_u32_be<R: io::Read>(reader: R) -> io::Result<u32> {
+pub fn read_u32_be(reader: &mut Cursor) -> Result<u32, SeaError> {
     let data = read_bytes(reader)?;
     Ok(u32::from_be_bytes(data))
 }
 
 #[inline(always)]
-pub fn read_u32_le<R: io::Read>(reader: R) -> io::Result<u32> {
+pub fn read_u32_le(reader: &mut Cursor) -> Result<u32, SeaError> {
     let data = read_bytes(reader)?;
     Ok(u32::from_le_bytes(data))
 }
 
-pub fn read_max_or_zero<R: io::Read>(mut reader: R, at_least_bytes: usize) -> io::Result<Vec<u8>> {
+pub fn read_max_or_zero(reader: &mut Cursor, at_least_bytes: usize) -> Result<Vec<u8>, SeaError> {
     let mut buffer = vec![0u8; at_least_bytes];
     let mut total_bytes_read = 0;
 

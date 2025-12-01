@@ -12,14 +12,17 @@ license = "MIT"
 
 [dependencies]
 bytemuck = "1.21.0"
+libm = "0.2.15"
 
 [dev-dependencies]
 hound = "3.5.1"
 clap = "4.5.30"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
+
 
 [features]
 default = ["wasm-api"]
+std = []
 wasm-api = []

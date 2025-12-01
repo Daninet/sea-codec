@@ -1,10 +1,8 @@
-use std::{
-    io::{self},
-    rc::Rc,
-};
+use alloc::{rc::Rc, string::String, vec::Vec};
 
 use crate::{
     codec::{chunk::SeaChunk, common::read_max_or_zero},
+    cursor::Cursor,
     encoder::EncoderSettings,
 };
 
@@ -37,18 +35,18 @@ impl SeaFileHeader {
             && self.sample_rate > 0
     }
 
-    pub fn from_reader<R: io::Read>(mut reader: &mut R) -> Result<Self, SeaError> {
-        let magic = read_u32_be(&mut reader)?;
+    pub fn from_reader(reader: &mut Cursor) -> Result<Self, SeaError> {
+        let magic = read_u32_be(reader)?;
         if magic != SEAC_MAGIC {
             return Err(SeaError::InvalidFile);
         }
-        let version = read_u8(&mut reader)?;
-        let channels = read_u8(&mut reader)?;
-        let chunk_size = read_u16_le(&mut reader)?;
-        let frames_per_chunk = read_u16_le(&mut reader)?;
-        let sample_rate = read_u32_le(&mut reader)?;
-        let total_frames = read_u32_le(&mut reader)?;
-        let metadata_size = read_u32_le(&mut reader)?;
+        let version = read_u8(reader)?;
+        let channels = read_u8(reader)?;
+        let chunk_size = read_u16_le(reader)?;
+        let frames_per_chunk = read_u16_le(reader)?;
+        let sample_rate = read_u32_le(reader)?;
+        let total_frames = read_u32_le(reader)?;
+        let metadata_size = read_u32_le(reader)?;
 
         let mut metadata = Vec::<u8>::with_capacity(metadata_size as usize);
         reader.read_exact(&mut metadata)?;
@@ -128,8 +126,8 @@ impl SeaFile {
         })
     }
 
-    pub fn from_reader<R: io::Read>(mut reader: &mut R) -> Result<Self, SeaError> {
-        let header = SeaFileHeader::from_reader(&mut reader)?;
+    pub fn from_reader(reader: &mut Cursor) -> Result<Self, SeaError> {
+        let header = SeaFileHeader::from_reader(reader)?;
 
         Ok(SeaFile {
             header,
@@ -177,9 +175,9 @@ impl SeaFile {
         Ok(output)
     }
 
-    pub fn samples_from_reader<R: io::Read>(
+    pub fn samples_from_reader(
         &mut self,
-        reader: &mut R,
+        reader: &mut Cursor,
         remaining_frames: Option<usize>,
     ) -> Result<Option<Vec<i16>>, SeaError> {
         let encoded = read_max_or_zero(reader, self.header.chunk_size as usize)?;

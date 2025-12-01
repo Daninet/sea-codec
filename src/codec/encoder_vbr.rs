@@ -1,3 +1,6 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::{
     codec::{common::SeaResidualSize, lms::LMS_LEN},
     encoder::EncoderSettings,
@@ -51,7 +54,7 @@ impl VbrEncoder {
         vbr_bitrate -= 2.0 / encoder_settings.scale_factor_frames as f32;
 
         // compensate with target distribution
-        let base_residuals = encoder_settings.residual_bits.floor();
+        let base_residuals = libm::floorf(encoder_settings.residual_bits);
         let new_bitrate = TARGET_RESIDUAL_DISTRIBUTION[1] * (base_residuals - 1.0)
             + TARGET_RESIDUAL_DISTRIBUTION[2] * base_residuals
             + TARGET_RESIDUAL_DISTRIBUTION[3] * (base_residuals + 1.0)
@@ -64,7 +67,7 @@ impl VbrEncoder {
 
     // returns items count [target-1, target, target+1, target+2]
     fn interpolate_distribution(items: usize, target_rate: f32) -> [usize; 4] {
-        let frac = target_rate.fract();
+        let (_, frac) = libm::modff(target_rate);
         let om_frac = 1.0 - frac;
 
         let mut percentages = [0f32; 4];

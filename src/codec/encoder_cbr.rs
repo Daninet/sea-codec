@@ -1,3 +1,6 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::encoder::EncoderSettings;
 
 use super::{
@@ -18,7 +21,7 @@ impl CbrEncoder {
     pub fn new(file_header: &SeaFileHeader, encoder_settings: &EncoderSettings) -> Self {
         CbrEncoder {
             channels: file_header.channels as usize,
-            residual_size: SeaResidualSize::from(encoder_settings.residual_bits.floor() as u8),
+            residual_size: SeaResidualSize::from(libm::floorf(encoder_settings.residual_bits) as u8),
             scale_factor_frames: encoder_settings.scale_factor_frames as usize,
             base_encoder: EncoderBase::new(
                 file_header.channels as usize,
