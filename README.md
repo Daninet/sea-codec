@@ -7,7 +7,7 @@ You can test SEA in your browser here: [https://daninet.github.io/sea-codec/](ht
 ### Key Features
 
 - **Fast, low complexity, time-domain compression.** The decoder fits into ~250 lines of C code.
-- Ideal for **low-power** embedded devices, game assets, and live streaming.
+- Ideal for **low-power** embedded devices, game assets, and live streaming. Supports `no-std` environments.
 - **Flat frequency response:** No low-pass filtering is applied, preserving the full frequency range.
 - **Variable bitrate:** 1.2 - 8.5 bits per sample
 - Constant and variable bitrate (**CBR** and **VBR**) modes.
