@@ -53,17 +53,15 @@ impl<'inp> SeaDecoder<'inp> {
             None
         };
 
-        let reader_res = self
-            .file
-            .samples_from_reader(&mut self.cursor, remaining_frames)?;
+        let samples_written =
+            self.file
+                .samples_from_reader(&mut self.cursor, remaining_frames, result)?;
 
-        match reader_res {
-            Some(samples) => {
-                self.frames_read += samples.len() / self.file.header.channels as usize;
-                result.extend_from_slice(samples.as_slice());
-                Ok(true)
-            }
-            None => Ok(false),
+        if samples_written == 0 {
+            Ok(false)
+        } else {
+            self.frames_read += samples_written / self.file.header.channels as usize;
+            Ok(true)
         }
     }
 

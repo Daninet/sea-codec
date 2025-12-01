@@ -179,10 +179,11 @@ impl SeaFile {
         &mut self,
         reader: &mut Cursor,
         remaining_frames: Option<usize>,
-    ) -> Result<Option<Vec<i16>>, SeaError> {
+        output: &mut Vec<i16>,
+    ) -> Result<usize, SeaError> {
         let encoded = read_max_or_zero(reader, self.header.chunk_size as usize)?;
         if encoded.is_empty() {
-            return Ok(None);
+            return Ok(0);
         }
 
         let chunk = SeaChunk::from_slice(&encoded, &self.header, remaining_frames);
@@ -196,11 +197,11 @@ impl SeaFile {
                     ));
                 }
                 let decoder = self.decoder.as_mut().unwrap();
-                let decoded = match chunk.chunk_type {
-                    SeaChunkType::Cbr => decoder.decode_cbr(&chunk),
-                    SeaChunkType::Vbr => decoder.decode_vbr(&chunk),
+                match chunk.chunk_type {
+                    SeaChunkType::Cbr => decoder.decode_cbr(&chunk, output),
+                    SeaChunkType::Vbr => decoder.decode_vbr(&chunk, output),
                 };
-                Ok(Some(decoded))
+                Ok(self.header.channels as usize * chunk.frames_per_chunk)
             }
             Err(err) => Err(err),
         }
