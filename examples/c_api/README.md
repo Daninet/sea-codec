@@ -58,5 +58,5 @@ To build a static library for a different platform (e.g., ARM Cortex-M3), use `r
 
 ```sh
 rustup target add thumbv7m-none-eabi
-cargo build --release --target thumbv7m-none-eabi
+cargo build --release --target thumbv7m-none-eabi --features c-api
 ```

@@ -13,6 +13,7 @@ pub mod encoder;
 #[cfg(all(target_arch = "wasm32", feature = "wasm-api"))]
 pub mod wasm_api;
 
+#[cfg(feature = "c-api")]
 pub mod c_api;
 
 pub fn sea_encode(

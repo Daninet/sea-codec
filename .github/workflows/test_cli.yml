@@ -49,5 +49,8 @@ jobs:
       - name: Lint with Clippy
         run: cargo clippy -- -D warnings
 
+      - name: Lint with Clippy (C API)
+        run: cargo clippy --features c-api -- -D warnings
+
       # - name: Cargo Test
       #   run: cargo test

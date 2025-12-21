@@ -18,7 +18,7 @@ message(STATUS "Looking for library in ${LIB_DIR}")
 find_library(SEA_LIB NAMES sea_codec libsea_codec sea_codec.dll PATHS ${LIB_DIR} NO_DEFAULT_PATH)
 
 if(NOT SEA_LIB)
-    message(WARNING "sea-codec library not found in ${LIB_DIR}. Please build the rust project first (cargo build).")
+    message(WARNING "sea-codec library not found in ${LIB_DIR}. Please build the rust project first (cargo build --features c-api).")
 endif()
 
 add_executable(c_example main.c)

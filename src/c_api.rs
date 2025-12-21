@@ -39,6 +39,12 @@ pub extern "C" fn sea_encoder_default_settings() -> CSeaEncoderSettings {
 }
 
 #[no_mangle]
+/// # Safety
+///
+/// * `input_samples` must be a valid pointer to an array of `i16` of length `input_length`.
+/// * `output_data` must be a valid pointer to a pointer where the output buffer address will be stored.
+/// * `output_length` must be a valid pointer where the output length will be stored.
+/// * If `settings` is not null, it must point to a valid `CSeaEncoderSettings` struct.
 pub unsafe extern "C" fn sea_encode(
     input_samples: *const i16,
     input_length: usize,
@@ -73,6 +79,12 @@ pub unsafe extern "C" fn sea_encode(
 }
 
 #[no_mangle]
+/// # Safety
+///
+/// * `encoded_data` must be a valid pointer to a byte array of length `encoded_length`.
+/// * `output_samples` must be a valid pointer to a pointer where the decoded samples address will be stored.
+/// * `output_sample_count` must be a valid pointer where the sample count will be stored.
+/// * `output_sample_rate` and `output_channels` may be null, but if provided must be valid pointers.
 pub unsafe extern "C" fn sea_decode(
     encoded_data: *const u8,
     encoded_length: usize,
@@ -109,6 +121,10 @@ pub unsafe extern "C" fn sea_decode(
 }
 
 #[no_mangle]
+/// # Safety
+///
+/// * `data` must be a pointer to a memory block allocated by `sea_encode` (or compatible Rust allocator).
+/// * `length` must match the length of the allocated block.
 pub unsafe extern "C" fn sea_free_packet(data: *mut u8, length: usize) {
     if !data.is_null() {
         let _ = Vec::from_raw_parts(data, length, length);
@@ -116,6 +132,10 @@ pub unsafe extern "C" fn sea_free_packet(data: *mut u8, length: usize) {
 }
 
 #[no_mangle]
+/// # Safety
+///
+/// * `samples` must be a pointer to a memory block allocated by `sea_decode` (or compatible Rust allocator).
+/// * `length` must match the length of the allocated block.
 pub unsafe extern "C" fn sea_free_samples(samples: *mut i16, length: usize) {
     if !samples.is_null() {
         let _ = Vec::from_raw_parts(samples, length, length);
