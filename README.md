@@ -48,6 +48,11 @@ Options:
           Print help
 ```
 
+### C API
+
+A C API is available for integrating SEA into C/C++ projects.
+See the [C API README](examples/c_api/README.md) for usage details and build instructions.
+
 # SEA file specification
 
 A SEA file consists of a file header followed by a series of chunks. Samples are stored as 16-bit signed integers in interleaved format. All values are stored in little-endian order.
