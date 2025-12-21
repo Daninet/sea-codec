@@ -7,26 +7,29 @@ mod helpers;
 
 #[test]
 fn test_sample_len() {
-    for channels in [1, 2, 3] {
-        let frame_size: i32 = 100;
-        for mul in [1, 2, 3, 100] {
-            let start = ((mul * frame_size) - 2).max(0);
-            for sample_len in start..(mul * frame_size + 2) {
-                println!("Testing channels={} sample_len={}", channels, sample_len);
-                let input = gen_test_signal(channels, sample_len as usize);
-                let output = encode_decode(
-                    &input,
-                    TEST_SAMPLE_RATE,
-                    channels,
-                    EncoderSettings {
-                        scale_factor_bits: 4,
-                        ..Default::default()
-                    },
-                );
-                assert_eq!(input.len(), output.decoded.len());
-                let quality = helpers::get_audio_quality(&input, &output.decoded);
-                println!("Quality: {:?}", quality);
-                // assert!(quality.psnr < -18.0);
+    for vbr in [false, true] {
+        for channels in [1, 2, 3] {
+            let frame_size: i32 = 100;
+            for mul in [1, 2, 3, 100] {
+                let start = ((mul * frame_size) - 2).max(0);
+                for sample_len in start..(mul * frame_size + 2) {
+                    println!("Testing channels={} sample_len={}", channels, sample_len);
+                    let input = gen_test_signal(channels, sample_len as usize);
+                    let output = encode_decode(
+                        &input,
+                        TEST_SAMPLE_RATE,
+                        channels,
+                        EncoderSettings {
+                            scale_factor_bits: 4,
+                            vbr,
+                            ..Default::default()
+                        },
+                    );
+                    assert_eq!(input.len(), output.decoded.len());
+                    let quality = helpers::get_audio_quality(&input, &output.decoded);
+                    println!("Quality: {:?}", quality);
+                    // assert!(quality.psnr < -18.0);
+                }
             }
         }
     }

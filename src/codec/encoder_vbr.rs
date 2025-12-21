@@ -67,7 +67,7 @@ impl VbrEncoder {
 
     // returns items count [target-1, target, target+1, target+2]
     fn interpolate_distribution(items: usize, target_rate: f32) -> [usize; 4] {
-        let (_, frac) = libm::modff(target_rate);
+        let (frac, _) = libm::modff(target_rate);
         let om_frac = 1.0 - frac;
 
         let mut percentages = [0f32; 4];
