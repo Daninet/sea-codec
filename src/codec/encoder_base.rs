@@ -15,7 +15,7 @@ pub struct EncoderBase {
     scale_factor_bits: usize,
 
     current_residuals: Vec<u8>,
-    prev_scalefactor: Vec<i32>,
+    pub prev_scalefactor: Vec<i32>,
     best_residual_bits: Vec<u8>,
     dequant_tab: SeaDequantTab,
     quant_tab: SeaQuantTab,

@@ -20,9 +20,6 @@ pub struct VbrEncoder {
     base_encoder: EncoderBase,
 }
 
-// const TARGET_RESIDUAL_DISTRIBUTION: [f32; 6] = [0.00, 0.09, 0.82, 0.07, 0.02, 0.00]; // ([0, target-1, target, target+1, target+2, 0])
-const TARGET_RESIDUAL_DISTRIBUTION: [f32; 6] = [0.00, 0.00, 0.95, 0.05, 0.00, 0.00]; // TODO: it needs tuning
-
 impl VbrEncoder {
     pub fn new(file_header: &SeaFileHeader, encoder_settings: &EncoderSettings) -> Self {
         VbrEncoder {
@@ -52,50 +49,93 @@ impl VbrEncoder {
 
         // compensate vbr data
         vbr_bitrate -= 2.0 / encoder_settings.scale_factor_frames as f32;
-
-        // compensate with target distribution
-        let base_residuals = libm::floorf(encoder_settings.residual_bits);
-        let new_bitrate = TARGET_RESIDUAL_DISTRIBUTION[1] * (base_residuals - 1.0)
-            + TARGET_RESIDUAL_DISTRIBUTION[2] * base_residuals
-            + TARGET_RESIDUAL_DISTRIBUTION[3] * (base_residuals + 1.0)
-            + TARGET_RESIDUAL_DISTRIBUTION[4] * (base_residuals + 2.0);
-        let diff = new_bitrate - base_residuals;
-        vbr_bitrate -= diff;
-
         vbr_bitrate
     }
 
-    // returns items count [target-1, target, target+1, target+2]
-    fn interpolate_distribution(items: usize, target_rate: f32) -> [usize; 4] {
-        let (frac, _) = libm::modff(target_rate);
-        let om_frac = 1.0 - frac;
-
-        let mut percentages = [0f32; 4];
-        for i in 0..4 {
-            percentages[i] = TARGET_RESIDUAL_DISTRIBUTION[i] * frac
-                + TARGET_RESIDUAL_DISTRIBUTION[i + 1] * om_frac;
+    // returns (base_residual, items count [base-1, base, base+1, base+2])
+    fn interpolate_distribution(items: usize, target_rate: f32) -> (i32, [usize; 4]) {
+        if target_rate < 2.0 || target_rate > 6.0 {
+            panic!("target must be in [2, 6]");
         }
 
-        let mut res = [0usize; 4];
-        let mut sum = 0usize;
+        // 1. Detect the "Danger Zone" using modulo
+        // This occurs when the decimal part is between 0.3 and 0.5
+        let frac = target_rate.fract();
+        let is_transition_zone = frac >= 0.3 && frac < 0.5;
 
-        // distribute remaining using TARGET_RESIDUAL_DISTRIBUTION
-        while sum < items {
-            let remaining = items - sum;
+        let pc: f32;
+        let pd: f32;
+        let offset: f32;
+        let t: i32;
+
+        if is_transition_zone {
+            // Boosted offsets to pull the mean up for targets like X.4
+            pc = 0.25;
+            pd = 0.125;
+            t = target_rate.floor() as i32;
+        } else {
+            // Standard offsets
+            pc = 0.15;
+            pd = 0.075;
+            t = target_rate.round() as i32;
+        }
+        offset = (1.0 * pc) + (2.0 * pd);
+
+        // 2. Calculate percentages
+        // Derived Mean Formula: pa = t + offset - target
+        let mut pa = (t as f32) + offset - target_rate;
+        let mut pb = (1.0 - pc - pd) - pa;
+
+        // 3. Safety Clamping (Prevents negatives in extreme edge cases)
+        let remaining_pct = 1.0 - pc - pd;
+        if pa < 0.0 {
+            pa = 0.0;
+            pb = remaining_pct;
+        }
+        if pb < 0.0 {
+            pb = 0.0;
+            pa = remaining_pct;
+        }
+
+        // 4. Convert to absolute counts
+        let total_f = items as f32;
+        let a = (total_f * pa).floor() as usize;
+        let b = (total_f * pb).floor() as usize;
+        let c = (total_f * pc).floor() as usize;
+        let d = (total_f * pd).floor() as usize;
+
+        // 5. Greedy Remainder Distribution
+        let mut counts = [a, b, c, d];
+        let weights = [t - 1, t, t + 1, t + 2];
+        let current_count_sum: usize = counts.iter().sum();
+        let mut rem = items - current_count_sum;
+        let target_sum = target_rate * total_f;
+
+        while rem > 0 {
+            let current_sum: f32 = weights
+                .iter()
+                .zip(counts.iter())
+                .map(|(w, count)| (*w as f32) * (*count as f32))
+                .sum();
+
+            let mut best_bucket = 0;
+            let mut min_diff = f32::INFINITY;
+
             for i in 0..4 {
-                let value = (remaining as f32 * percentages[i]) as usize;
-                sum += value;
-                res[i] += value;
+                let potential_sum = current_sum + (weights[i] as f32);
+                let diff = (potential_sum - target_sum).abs();
+                if diff < min_diff {
+                    min_diff = diff;
+                    best_bucket = i;
+                }
             }
-
-            // if remaining is not enough to distribute based on TARGET_RESIDUAL_DISTRIBUTION
-            if items - sum == remaining {
-                sum += remaining;
-                res[1] += remaining
-            }
+            counts[best_bucket] += 1;
+            rem -= 1;
         }
 
-        res
+        println!("res: {:.3} {} {:?}", target_rate, t, counts);
+
+        (t, counts)
     }
 
     fn choose_residual_len_from_errors(&self, input_len: usize, errors: &[u64]) -> Vec<u8> {
@@ -105,10 +145,10 @@ impl VbrEncoder {
         let mut indices: Vec<u16> = (0..sortable_items as u16).collect();
         indices.sort_unstable_by(|&a, &b| errors[a as usize].cmp(&errors[b as usize]));
 
-        let [minus_one_items, _, plus_one_items, plus_two_items] =
+        let (base_residual, [minus_one_items, _, plus_one_items, plus_two_items]) =
             Self::interpolate_distribution(sortable_items, self.vbr_target_bitrate);
 
-        let base_residual_bits = self.vbr_target_bitrate as u8;
+        let base_residual_bits = base_residual as u8;
 
         let mut residual_sizes = vec![base_residual_bits; errors.len()];
 
@@ -128,12 +168,6 @@ impl VbrEncoder {
             .take(plus_two_items)
         {
             residual_sizes[*index as usize] = base_residual_bits + 2;
-        }
-
-        // count how many times each residual size appears
-        let mut residual_size_counts = [0; 9];
-        for i in 0..errors.len() {
-            residual_size_counts[residual_sizes[i] as usize] += 1;
         }
 
         residual_sizes
@@ -186,6 +220,7 @@ impl SeaEncoderTrait for VbrEncoder {
         let mut residuals: Vec<u8> = vec![0u8; samples.len()];
 
         let residual_bits: Vec<u8> = self.analyze(samples);
+        println!("residual_bits: {:?}", residual_bits);
 
         let slice_size = self.scale_factor_frames as usize * self.channels;
 

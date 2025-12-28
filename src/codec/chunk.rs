@@ -60,7 +60,11 @@ impl SeaChunk {
             chunk_type,
             scale_factor_bits: encoder_settings.scale_factor_bits,
             scale_factor_frames: encoder_settings.scale_factor_frames,
-            residual_size: SeaResidualSize::from(libm::floorf(encoder_settings.residual_bits) as u8),
+            residual_size: if is_vbr {
+                SeaResidualSize::from(vbr_residual_sizes.iter().min().copied().unwrap_or(1) + 1)
+            } else {
+                SeaResidualSize::from(libm::floorf(encoder_settings.residual_bits) as u8)
+            },
 
             lms: Vec::from(lms),
             scale_factors,

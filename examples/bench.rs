@@ -10,9 +10,9 @@ use std::{fs, io::BufWriter, path::Path, time::Instant};
 use sea_codec::{encoder::EncoderSettings, sea_decode, sea_encode};
 use wav::{read_wav, write_wav, Wave};
 
-const SAMPLE_NAME: &str = "piano_long";
+const SAMPLE_NAME: &str = "ivertita";
 const BASE_PATH: &str = "E:/audio_samples/mixed";
-const RESIDUAL_SIZE: f32 = 5.0;
+const RESIDUAL_SIZE: f32 = 3.23;
 
 fn encode_decode() {
     let input_wave_path = &format!("{}/{}.wav", BASE_PATH, SAMPLE_NAME);
@@ -27,7 +27,8 @@ fn encode_decode() {
         residual_bits: RESIDUAL_SIZE,
         scale_factor_frames: 20,
         scale_factor_bits: 4,
-        vbr: false,
+        vbr: true,
+        // frames_per_chunk: 5120,
         ..Default::default()
     };
 
