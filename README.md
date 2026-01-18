@@ -48,10 +48,11 @@ Options:
           Print help
 ```
 
-### C API
+### Other implementations
 
-A C API is available for integrating SEA into C/C++ projects.
-See the [C API README](examples/c_api/README.md) for usage details and build instructions.
+- The Rust reference implementation exposes C API for integrating SEA into C/C++ projects. See the [C API README](examples/c_api/README.md) for usage details and build instructions.
+- [C/C++ implementation](https://github.com/tobybear/sea-codec-c) from @tobybear
+- [Minimal C decoder](c/) living inside this repo (decode only)
 
 # SEA file specification
 
