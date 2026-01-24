@@ -12,13 +12,13 @@ use super::{
 
 pub struct EncoderBase {
     channels: usize,
-    scale_factor_bits: usize,
+    pub scale_factor_bits: usize,
 
     current_residuals: Vec<u8>,
     pub prev_scalefactor: Vec<i32>,
     best_residual_bits: Vec<u8>,
-    dequant_tab: SeaDequantTab,
-    quant_tab: SeaQuantTab,
+    pub dequant_tab: SeaDequantTab,
+    pub quant_tab: SeaQuantTab,
     pub lms: Vec<SeaLMS>,
 }
 
@@ -95,7 +95,7 @@ impl EncoderBase {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn get_residuals_with_best_scalefactor(
+    pub fn get_residuals_with_best_scalefactor(
         &self,
         channels: usize,
         dequant_tab: &[Vec<i32>],

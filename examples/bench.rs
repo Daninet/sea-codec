@@ -10,7 +10,7 @@ use std::{fs, io::BufWriter, path::Path, time::Instant};
 use sea_codec::{encoder::EncoderSettings, sea_decode, sea_encode};
 use wav::{read_wav, write_wav, Wave};
 
-const SAMPLE_NAME: &str = "ivertita";
+const SAMPLE_NAME: &str = "ivertita_short";
 const BASE_PATH: &str = "E:/audio_samples/mixed";
 const RESIDUAL_SIZE: f32 = 3.23;
 
