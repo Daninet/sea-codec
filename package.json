@@ -1,0 +1,15 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "build": "npx microbundle -i ./deps.js -f modern -o dist/deps.mjs"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "audio-decode": "^2.2.2",
+    "microbundle": "^0.15.1"
+  }
+}

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sea Audio Converter</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      a {
+        color: #0000ff;
+      }
+      .container {
+        display: flex;
+        gap: 20px;
+      }
+      .column {
+        flex: 1;
+        border: 1px solid #ccc;
+        padding: 20px;
+        border-radius: 8px;
+      }
+      .file-drop {
+        border: 2px dashed #ccc;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+        cursor: pointer;
+      }
+      .file-drop.dragover {
+        border-color: #000;
+      }
+      audio {
+        width: 100%;
+        margin-top: 5px;
+      }
+      .hidden {
+        display: none;
+      }
+      .details {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #666;
+      }
+      label {
+        display: inline-block;
+        margin: 10px 0;
+      }
+      select {
+        padding: 5px;
+      }
+      button {
+        padding: 8px 15px;
+      }
+      #error {
+        color: red;
+        font-weight: bold;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>
+      SEA - Simple Embedded Audio Codec
+      <a href="https://github.com/Daninet/sea-codec" target="_blank">[GitHub]</a>
+    </h2>
+    <div class="container">
+      <!-- Encoding Column -->
+      <div class="column">
+        <h3>Encode to Sea</h3>
+        <div class="file-drop" id="encode_drop">
+          Drag & drop an audio file (WAV/FLAC/MP3/OGG/OPUS) or click to upload.
+        </div>
+        <input type="file" id="encode_input" accept=".wav,.mp3,.ogg,.flac,.opus" class="hidden" />
+        <div>
+          <label for="residual_size">Bitrate:</label>
+          <select id="residual_size" name="residual_size">
+            <option value="1">~1.2 bps (13.3x compression)</option>
+            <option value="2">~2.2 bps ( 7.3x compression)</option>
+            <option value="3" selected>~3.2 bps ( 5.0x compression)</option>
+            <option value="4">~4.2 bps ( 3.8x compression)</option>
+            <option value="5">~5.2 bps ( 3.1x compression)</option>
+            <option value="6">~6.2 bps ( 2.6x compression)</option>
+            <option value="7">~7.2 bps ( 2.2x compression)</option>
+            <option value="8">~8.2 bps ( 2.0x compression)</option>
+            <option value="vbr">VBR (experimental)</option>
+          </select>
+        </div>
+        <div>
+          VBR target bitrate:
+          <input
+            type="range"
+            min="1.5"
+            max="8"
+            value="3"
+            step="0.1"
+            id="vbr_target_bitrate"
+            disabled="disabled"
+          />
+          <label id="vbr_target_bitrate_label">3.0</label>
+        </div>
+        <div>
+          <label for="sample_rate">Target Sample Rate:</label>
+          <select id="sample_rate" name="sample_rate">
+            <option value="original" selected>Original</option>
+            <option value="8000">8000 Hz</option>
+            <option value="11025">11025 Hz</option>
+            <option value="12000">12000 Hz</option>
+            <option value="16000">16000 Hz</option>
+            <option value="22050">22050 Hz</option>
+            <option value="24000">24000 Hz</option>
+            <option value="32000">32000 Hz</option>
+            <option value="44100">44100 Hz</option>
+            <option value="48000">48000 Hz</option>
+            <option value="96000">96000 Hz</option>
+          </select>
+        </div>
+        <br />
+        <button id="encode_submit">Encode</button>
+        <div id="encode_result" style="margin-top: 10px"></div>
+      </div>
+
+      <!-- Decoding Column -->
+      <div class="column">
+        <h3>Decode from Sea</h3>
+        <div class="file-drop" id="decode_drop">Drag & drop a Sea file or click to upload.</div>
+        <input type="file" id="decode_input" accept=".sea" class="hidden" />
+        <button id="decode_submit">Decode</button>
+        <div id="decode_result" style="margin-top: 10px"></div>
+      </div>
+    </div>
+
+    <div id="error"></div>
+
+    <script type="module" src="app.mjs"></script>
+
+    <div style="text-align: center">
+      <p><a href="https://github.com/Daninet/sea-codec" target="_blank">[GitHub]</a></p>
+      <p style="text-align: center">Copyright © 2025 Dani Biró</p>
+    </div>
+  </body>
+</html>
