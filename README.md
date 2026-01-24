@@ -44,6 +44,8 @@ Options:
           Sets the distance between scale factors in frames [default: 20]
   -v, --vbr
           Enables Variable Bit Rate (VBR)
+  -r, --resample <resample>
+          Sets the target sample rate for resampling
   -h, --help
           Print help
 ```

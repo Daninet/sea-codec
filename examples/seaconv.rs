@@ -143,6 +143,12 @@ fn main() {
                 .action(ArgAction::SetTrue)
                 .help("Enables Variable Bit Rate (VBR)"),
         )
+        .arg(
+            Arg::new("resample")
+                .long("resample")
+                .short('r')
+                .help("Sets the target sample rate for resampling"),
+        )
         .get_matches();
 
     let settings = get_encoder_settings(&matches);
@@ -165,12 +171,38 @@ fn main() {
                 std::process::exit(1);
             });
 
+            let mut samples = input_wave.samples;
+            let mut sample_rate = input_wave.sample_rate;
+
+            if let Some(target_rate_str) = matches.get_one::<String>("resample") {
+                let target_rate = target_rate_str.parse::<u32>().unwrap_or_else(|_| {
+                    eprintln!("Error: Failed to parse resample rate");
+                    std::process::exit(1);
+                });
+
+                #[cfg(feature = "resample")]
+                {
+                    samples = sea_codec::resample::resample(
+                        &samples,
+                        sample_rate,
+                        target_rate,
+                        input_wave.channels as u32,
+                    );
+                    sample_rate = target_rate;
+                }
+                #[cfg(not(feature = "resample"))]
+                {
+                    eprintln!("Error: Resampling feature is not enabled. Recompile with --features resample");
+                    std::process::exit(1);
+                }
+            }
+
             let mut sea_encoder = SeaEncoder::from_slice(
                 input_wave.channels as u8,
-                input_wave.sample_rate,
-                Some(input_wave.samples.len() as u32 / input_wave.channels),
+                sample_rate,
+                Some(samples.len() as u32 / input_wave.channels as u32),
                 settings,
-                &input_wave.samples,
+                &samples,
             )
             .unwrap_or_else(|_| {
                 eprintln!("Error: Failed to create encoder");
@@ -215,11 +247,36 @@ fn main() {
             {}
 
             let info = sea_decoder.get_header();
+            let mut samples = sea_decoded;
+            let mut sample_rate = info.sample_rate;
+
+            if let Some(target_rate_str) = matches.get_one::<String>("resample") {
+                let target_rate = target_rate_str.parse::<u32>().unwrap_or_else(|_| {
+                    eprintln!("Error: Failed to parse resample rate");
+                    std::process::exit(1);
+                });
+
+                #[cfg(feature = "resample")]
+                {
+                    samples = sea_codec::resample::resample(
+                        &samples,
+                        sample_rate,
+                        target_rate,
+                        info.channels as u32,
+                    );
+                    sample_rate = target_rate;
+                }
+                #[cfg(not(feature = "resample"))]
+                {
+                    eprintln!("Error: Resampling feature is not enabled. Recompile with --features resample");
+                    std::process::exit(1);
+                }
+            }
 
             write_wav(
-                sea_decoded.as_slice(),
+                samples.as_slice(),
                 info.channels as u16,
-                info.sample_rate,
+                sample_rate,
                 output,
             )
             .unwrap_or_else(|_| {

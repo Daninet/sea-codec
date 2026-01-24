@@ -25,8 +25,10 @@ const worker = (() => {
 
   return {
     decodeAudioFile: (...args) => call("decodeAudioFile", ...args),
+    resampleAudio: (...args) => call("resampleAudio", ...args),
     encodeSEA: (...args) => call("encodeSEA", ...args),
     decodeSEA: (...args) => call("decodeSEA", ...args),
+    compareAudio: (...args) => call("compareAudio", ...args),
   };
 })();
 
@@ -35,6 +37,7 @@ const DOM_ENCODE_FILE = document.getElementById("encode_input");
 const DOM_RESIDUAL_SIZE = document.getElementById("residual_size");
 const DOM_VBR_TARGET_BITRATE = document.getElementById("vbr_target_bitrate");
 const DOM_VBR_TARGET_BITRATE_LABEL = document.getElementById("vbr_target_bitrate_label");
+const DOM_SAMPLE_RATE = document.getElementById("sample_rate");
 const DOM_ENCODE_SUBMIT = document.getElementById("encode_submit");
 const DOM_ENCODE_RESULT = document.getElementById("encode_result");
 
@@ -66,36 +69,75 @@ DOM_ENCODE_SUBMIT.addEventListener("click", async () => {
     channels,
   } = await worker.decodeAudioFile(inputArrayBuffer);
 
+  let processedSamples = interleavedInput;
+  let targetSampleRate = sampleRate;
+  let resampleDuration = 0;
+
+  if (DOM_SAMPLE_RATE.value !== "original") {
+    const requestedRate = parseInt(DOM_SAMPLE_RATE.value);
+    if (requestedRate !== sampleRate) {
+      DOM_ENCODE_RESULT.innerHTML = `<p>Resampling from ${sampleRate} to ${requestedRate} Hz...</p>`;
+      const resampleResult = await worker.resampleAudio(
+        interleavedInput,
+        sampleRate,
+        requestedRate,
+        channels
+      );
+      processedSamples = resampleResult.samples;
+      targetSampleRate = requestedRate;
+      resampleDuration = resampleResult.duration;
+    }
+  }
+
   const vbr = DOM_RESIDUAL_SIZE.value === "vbr";
   const residual_size = vbr
     ? parseFloat(DOM_VBR_TARGET_BITRATE.value)
     : parseInt(DOM_RESIDUAL_SIZE.value);
 
   const { encoded, duration: encodeDuration } = await worker.encodeSEA(
-    interleavedInput,
-    sampleRate,
+    processedSamples,
+    targetSampleRate,
     channels,
     residual_size,
     vbr
   );
 
   const {
-    differenceFromOriginal,
     wave: decodedWav,
+    samples: decodedSamples,
     duration: decodeDuration,
-    psnr,
-  } = await worker.decodeSEA(encoded, interleavedInput);
+  } = await worker.decodeSEA(encoded);
 
-  const pcm16Size = interleavedInput.length * 2;
-  const compressedSize = (encoded.length / pcm16Size) * 100;
+  const { psnr, differenceFromOriginal } = await worker.compareAudio(
+    interleavedInput,
+    sampleRate,
+    decodedSamples,
+    targetSampleRate,
+    channels
+  );
+
+  const originalPcm16Size = interleavedInput.length * 2;
+  const resampledPcm16Size = processedSamples.length * 2;
+  const compressedSizeRatio = (encoded.length / originalPcm16Size) * 100;
+  const isResampled = targetSampleRate !== sampleRate;
+
   const status = [
-    `PCM 16 bit size ${formatNumber(pcm16Size)} bytes`,
-    `Compressed size: ${formatNumber(encoded.length)} bytes (${compressedSize.toFixed(2)} %)`,
-    `Bits per sample: ${((encoded.length * 8) / interleavedInput.length).toFixed(2)} bps`,
+    `Sample rate: ${targetSampleRate} Hz ${
+      isResampled ? `(resampled from ${sampleRate} Hz)` : ""
+    }`,
+    isResampled ? `Original PCM 16 bit size: ${formatNumber(originalPcm16Size)} bytes` : "",
+    isResampled
+      ? `Resampled PCM 16 bit size: ${formatNumber(resampledPcm16Size)} bytes`
+      : `PCM 16 bit size: ${formatNumber(originalPcm16Size)} bytes`,
+    `Compressed size: ${formatNumber(encoded.length)} bytes (${compressedSizeRatio.toFixed(2)} %)`,
+    `Bits per sample: ${((encoded.length * 8) / processedSamples.length).toFixed(2)} bps`,
+    resampleDuration > 0 ? `Resampling took ${resampleDuration.toFixed(2)} ms` : "",
     `Encoding took ${encodeDuration.toFixed(2)} ms`,
     `Decoding took ${decodeDuration.toFixed(2)} ms`,
     `PSNR ${psnr.toFixed(2)} dB`,
-  ].join("<br />");
+  ]
+    .filter((s) => s)
+    .join("<br />");
 
   const audioUrl = URL.createObjectURL(new Blob([decodedWav], { type: "audio/wav" }));
   const differenceFromOriginalUrl = URL.createObjectURL(

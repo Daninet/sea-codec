@@ -43,7 +43,7 @@ jobs:
         with:
           command: build
           target: ${{ matrix.platform.target }}
-          args: "--example=seaconv --locked --release"
+          args: "--example=seaconv --features resample --locked --release"
           strip: false
 
       - name: Copy examples to parent dir

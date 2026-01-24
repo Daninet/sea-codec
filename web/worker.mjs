@@ -136,6 +136,57 @@ let wasm;
         wasmExports.deallocate(wasmChannelsBuffer, 4);
       }
     },
+    wasm_resample: (inputSamples, sourceRate, targetRate, channels) => {
+      if (!(inputSamples instanceof Int16Array))
+        throw new Error("inputSamples should be Int16Array");
+
+      let wasmInputBufferSize;
+      let wasmInputBuffer;
+      let wasmOutputBufferSize;
+      let wasmOutputBuffer;
+
+      try {
+        wasmInputBufferSize = inputSamples.byteLength;
+        wasmInputBuffer = wasmExports.allocate(wasmInputBufferSize);
+        const inputSamplesU8 = new Uint8Array(
+          inputSamples.buffer,
+          inputSamples.byteOffset,
+          inputSamples.byteLength
+        ).slice();
+
+        new Uint8Array(wasmExports.memory.buffer).set(inputSamplesU8, wasmInputBuffer);
+
+        // Estimate output size: slightly more than needed ratio to be safe
+        wasmOutputBufferSize = Math.ceil((inputSamples.byteLength * targetRate) / sourceRate) + 1024;
+        wasmOutputBuffer = wasmExports.allocate(wasmOutputBufferSize);
+
+        const outputLength = wasmExports.wasm_resample(
+          wasmInputBuffer,
+          wasmInputBufferSize,
+          sourceRate,
+          targetRate,
+          channels,
+          wasmOutputBuffer,
+          wasmOutputBufferSize
+        );
+
+        if (outputLength === 0) throw new Error("Resampling failed: Output buffer too small.");
+
+        const output = new Int16Array(
+          wasmExports.memory.buffer,
+          wasmOutputBuffer,
+          outputLength / 2
+        ).slice();
+
+        return output;
+      } catch (e) {
+        postMessage(["error", e.message]);
+        throw e;
+      } finally {
+        wasmExports.deallocate(wasmInputBuffer, wasmInputBufferSize);
+        wasmExports.deallocate(wasmOutputBuffer, wasmOutputBufferSize);
+      }
+    },
   };
 
   // warm up JIT
@@ -162,7 +213,18 @@ let exports = {
     };
   },
 
-  encodeSEA(interleavedSamples, sampleRate, channels, quality, vbr) {
+  resampleAudio(interleavedSamples, sourceRate, targetRate, channels) {
+    const start = performance.now();
+    const resampled = wasm.wasm_resample(interleavedSamples, sourceRate, targetRate, channels);
+    const end = performance.now();
+
+    return {
+      samples: resampled,
+      duration: end - start,
+    };
+  },
+
+  async encodeSEA(interleavedSamples, sampleRate, channels, quality, vbr) {
     const start = performance.now();
     const encoded = wasm.wasm_sea_encode(interleavedSamples, sampleRate, channels, quality, vbr);
     const end = performance.now();
@@ -173,30 +235,44 @@ let exports = {
     };
   },
 
-  decodeSEA(encodedData, originalData) {
+  decodeSEA(encodedData) {
     const start = performance.now();
     const { samples, sampleRate, channels } = wasm.wasm_sea_decode(encodedData);
     const end = performance.now();
     const wave = encodeWAV(samples, sampleRate, channels);
-    let psnr = 0;
-    let differenceFromOriginal = null;
 
-    if (originalData) {
-      psnr = getPSNR(originalData, samples);
-      differenceFromOriginal = encodeWAV(
-        calculateDifference(originalData, samples),
-        sampleRate,
+    return {
+      samples,
+      wave,
+      sampleRate,
+      channels,
+      duration: end - start,
+    };
+  },
+
+  compareAudio(originalSamples, originalSampleRate, decodedSamples, decodedSampleRate, channels) {
+    let processedDecoded = decodedSamples;
+    if (decodedSampleRate !== originalSampleRate) {
+      processedDecoded = wasm.wasm_resample(
+        decodedSamples,
+        decodedSampleRate,
+        originalSampleRate,
         channels
       );
     }
 
+    // Ensure lengths match for comparison
+    const minLength = Math.min(originalSamples.length, processedDecoded.length);
+    const a = originalSamples.slice(0, minLength);
+    const b = processedDecoded.slice(0, minLength);
+
+    const psnr = getPSNR(a, b);
+    const diff = calculateDifference(a, b);
+    const differenceFromOriginal = encodeWAV(diff, originalSampleRate, channels);
+
     return {
-      wave,
-      differenceFromOriginal,
-      sampleRate,
-      channels,
-      duration: end - start,
       psnr,
+      differenceFromOriginal,
     };
   },
 };

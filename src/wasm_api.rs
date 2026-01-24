@@ -109,3 +109,27 @@ pub unsafe extern "C" fn deallocate(ptr: *mut u8, size: usize) {
     let layout = Layout::from_size_align(size, 1).unwrap();
     dealloc(ptr, layout);
 }
+
+#[no_mangle]
+pub extern "C" fn wasm_resample(
+    input_samples: *const i16,
+    input_length: usize,
+    source_rate: u32,
+    target_rate: u32,
+    channels: u32,
+    output_buffer: *mut i16,
+    output_length: usize,
+) -> usize {
+    use crate::resample::resample;
+
+    let input_samples = unsafe { std::slice::from_raw_parts(input_samples, input_length / 2) };
+    let resampled = resample(input_samples, source_rate, target_rate, channels);
+
+    assert!(resampled.len() * 2 <= output_length);
+
+    unsafe {
+        std::ptr::copy_nonoverlapping(resampled.as_ptr(), output_buffer, resampled.len());
+    }
+
+    resampled.len() * 2
+}

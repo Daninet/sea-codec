@@ -1,6 +1,6 @@
 [package]
 name = "sea-codec"
-version = "0.6.1"
+version = "0.7.0"
 description = "Low-complexity, lossy audio codec designed for embedded devices"
 homepage = "https://github.com/Daninet/sea-codec"
 repository = "https://github.com/Daninet/sea-codec"
@@ -12,6 +12,8 @@ license = "MIT"
 
 [dependencies]
 libm = "0.2.15"
+rubato = { version = "1.0.1", optional = true }
+audioadapter-buffers = { version = "2.0.0", optional = true }
 
 [dev-dependencies]
 hound = "3.5.1"
@@ -21,7 +23,8 @@ clap = "4.5.30"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
-default = ["wasm-api"]
+default = ["std"]
 std = []
-wasm-api = ["std"]
+resample = ["std", "rubato", "audioadapter-buffers"]
+wasm-api = ["resample"]
 c-api = []

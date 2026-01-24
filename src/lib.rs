@@ -10,6 +10,7 @@ mod codec;
 mod cursor;
 pub mod decoder;
 pub mod encoder;
+pub mod resample;
 #[cfg(all(target_arch = "wasm32", feature = "wasm-api"))]
 pub mod wasm_api;
 
