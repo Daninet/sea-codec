@@ -29,6 +29,8 @@ jobs:
           command: check
 
       - name: Build WASM file
+        env:
+          RUSTFLAGS: -C link-arg=--allow-undefined
         run: |
           cargo build --release --features wasm-api --target wasm32-unknown-unknown
           cp ./target/wasm32-unknown-unknown/release/sea_codec.wasm ./web/codec.wasm
