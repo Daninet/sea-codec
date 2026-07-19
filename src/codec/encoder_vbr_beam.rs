@@ -18,6 +18,16 @@ struct TraceNode {
     symbol: u8,
 }
 
+pub(super) struct BeamPeriod<'a> {
+    pub(super) input: &'a [i16],
+    pub(super) start: usize,
+    pub(super) frames: usize,
+    pub(super) channel: usize,
+    pub(super) initial_lms: &'a SeaLMS,
+    pub(super) fallback_lms: &'a SeaLMS,
+    pub(super) fallback_residuals: &'a [u8],
+}
+
 /// Bounded residual-path refinement used by non-fast VBR effort levels.
 pub(super) struct ResidualBeamSearch {
     channels: usize,
@@ -35,22 +45,16 @@ impl ResidualBeamSearch {
     }
     pub(super) fn refine_period(
         &self,
-        input: &[i16],
-        start: usize,
-        frames: usize,
-        channel: usize,
+        period: &BeamPeriod,
         factor: usize,
         width: usize,
-        initial_lms: &SeaLMS,
-        fallback_lms: &SeaLMS,
-        fallback_residuals: &[u8],
     ) -> (u64, SeaLMS, [u8; 20]) {
         let levels = self.dequant.get_dqt(width);
         let mut paths: [Option<ResidualPath>; MAX_RESIDUAL_BEAM_WIDTH] =
             core::array::from_fn(|_| None);
         paths[0] = Some(ResidualPath {
             error: 0,
-            lms: initial_lms.clone(),
+            lms: period.initial_lms.clone(),
             trace: u16::MAX,
             symbol: 0,
         });
@@ -61,8 +65,8 @@ impl ResidualBeamSearch {
         }; MAX_RESIDUAL_BEAM_WIDTH * 2 * MAX_PERIOD_FRAMES];
         let mut trace_count = 0;
 
-        for frame in 0..frames {
-            let sample = input[start + frame * self.channels + channel];
+        for frame in 0..period.frames {
+            let sample = period.input[period.start + frame * self.channels + period.channel];
             let mut candidates: [Option<ResidualPath>; MAX_RESIDUAL_BEAM_WIDTH * 2] =
                 core::array::from_fn(|_| None);
             let mut candidate_count = 0;
@@ -121,7 +125,7 @@ impl ResidualBeamSearch {
         }) {
             let mut residuals = [0u8; MAX_PERIOD_FRAMES];
             let mut node_index = winner.trace as usize;
-            for residual in residuals[..frames].iter_mut().rev() {
+            for residual in residuals[..period.frames].iter_mut().rev() {
                 let node = trace[node_index];
                 *residual = node.symbol;
                 node_index = node.parent as usize;
@@ -130,10 +134,10 @@ impl ResidualBeamSearch {
         }
 
         let mut residuals = [0u8; MAX_PERIOD_FRAMES];
-        for frame in 0..frames {
-            residuals[frame] = fallback_residuals[frame * self.channels + channel];
+        for (frame, residual) in residuals.iter_mut().take(period.frames).enumerate() {
+            *residual = period.fallback_residuals[frame * self.channels + period.channel];
         }
-        (u64::MAX, fallback_lms.clone(), residuals)
+        (u64::MAX, period.fallback_lms.clone(), residuals)
     }
 
     fn factor_sse(

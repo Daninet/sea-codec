@@ -8,7 +8,7 @@ use crate::{
 use super::{
     common::{EncodedSamples, SeaEncoderTrait},
     encoder_base::EncoderBase,
-    encoder_vbr_beam::ResidualBeamSearch,
+    encoder_vbr_beam::{BeamPeriod, ResidualBeamSearch},
     file::SeaFileHeader,
     lms::SeaLMS,
 };
@@ -103,9 +103,11 @@ impl VbrEncoder {
     fn interpolate_distribution(&self, items: usize, target_rate: f32) -> [usize; 4] {
         let (frac, _) = libm::modff(target_rate);
         let mut percentages = [0f32; 4];
-        for i in 0..4 {
-            percentages[i] = self.residual_distribution[i] * frac
-                + self.residual_distribution[i + 1] * (1.0 - frac);
+        for (percentage, distribution) in percentages
+            .iter_mut()
+            .zip(self.residual_distribution.windows(2))
+        {
+            *percentage = distribution[0] * frac + distribution[1] * (1.0 - frac);
         }
 
         let mut result = [0usize; 4];
@@ -252,17 +254,17 @@ impl SeaEncoderTrait for VbrEncoder {
                     }
                     continue;
                 };
-                let (error, mut next_lms, mut symbols) = beam.refine_period(
+                let search_period = BeamPeriod {
                     input,
-                    0,
-                    input.len() / self.channels,
+                    start: 0,
+                    frames: input.len() / self.channels,
                     channel,
-                    factor,
-                    width,
-                    &lms[channel],
-                    &greedy_lms[channel],
-                    &greedy_residuals,
-                );
+                    initial_lms: &lms[channel],
+                    fallback_lms: &greedy_lms[channel],
+                    fallback_residuals: &greedy_residuals,
+                };
+                let (error, mut next_lms, mut symbols) =
+                    beam.refine_period(&search_period, factor, width);
                 let mut chosen_factor = factor;
                 let mut chosen_error = error;
                 if let Some(second_factor) = beam.ambiguous_neighbor_factor(
@@ -273,17 +275,8 @@ impl SeaEncoderTrait for VbrEncoder {
                     width,
                     &lms[channel],
                 ) {
-                    let (second_error, second_lms, second_symbols) = beam.refine_period(
-                        input,
-                        0,
-                        input.len() / self.channels,
-                        channel,
-                        second_factor,
-                        width,
-                        &lms[channel],
-                        &greedy_lms[channel],
-                        &greedy_residuals,
-                    );
+                    let (second_error, second_lms, second_symbols) =
+                        beam.refine_period(&search_period, second_factor, width);
                     if second_error < error {
                         next_lms = second_lms;
                         symbols = second_symbols;

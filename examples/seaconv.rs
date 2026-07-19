@@ -188,7 +188,9 @@ fn main() {
                 std::process::exit(1);
             });
 
+            #[allow(unused_mut)]
             let mut samples = input_wave.samples;
+            #[allow(unused_mut)]
             let mut sample_rate = input_wave.sample_rate;
 
             if let Some(target_rate_str) = matches.get_one::<String>("resample") {
@@ -196,6 +198,9 @@ fn main() {
                     eprintln!("Error: Failed to parse resample rate");
                     std::process::exit(1);
                 });
+
+                #[cfg(not(feature = "resample"))]
+                let _ = target_rate;
 
                 #[cfg(feature = "resample")]
                 {
@@ -264,7 +269,9 @@ fn main() {
             {}
 
             let info = sea_decoder.get_header();
+            #[allow(unused_mut)]
             let mut samples = sea_decoded;
+            #[allow(unused_mut)]
             let mut sample_rate = info.sample_rate;
 
             if let Some(target_rate_str) = matches.get_one::<String>("resample") {
@@ -272,6 +279,9 @@ fn main() {
                     eprintln!("Error: Failed to parse resample rate");
                     std::process::exit(1);
                 });
+
+                #[cfg(not(feature = "resample"))]
+                let _ = target_rate;
 
                 #[cfg(feature = "resample")]
                 {

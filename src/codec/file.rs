@@ -91,6 +91,10 @@ impl SeaFileHeader {
     }
 }
 
+#[expect(
+    clippy::large_enum_variant,
+    reason = "keeping encoders inline avoids heap allocation and per-chunk pointer indirection"
+)]
 enum ActiveEncoder {
     Cbr(CbrEncoder),
     Vbr(VbrEncoder),
