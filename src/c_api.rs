@@ -25,7 +25,6 @@ impl From<&CSeaEncoderSettings> for EncoderSettings {
             frames_per_chunk: c_settings.frames_per_chunk,
             vbr: c_settings.vbr,
             vbr_residual_beam_width: c_settings.vbr_effort,
-            ..EncoderSettings::default()
         }
     }
 }
