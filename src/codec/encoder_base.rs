@@ -29,6 +29,30 @@ pub fn sea_div(v: i32, scalefactor_reciprocal: i64) -> i32 {
 }
 
 impl EncoderBase {
+    #[inline]
+    fn lms_prediction(lms: &SeaLMS) -> Option<i32> {
+        let sum = lms
+            .weights
+            .iter()
+            .zip(lms.history)
+            .try_fold(0i64, |sum, (&weight, history)| {
+                sum.checked_add(weight as i64 * history as i64)
+            })?;
+        i32::try_from(sum).ok().map(|value| value >> 13)
+    }
+
+    #[inline]
+    fn lms_update_is_safe(lms: &SeaLMS, residual: i32) -> bool {
+        let delta = residual >> 4;
+        lms.history
+            .iter()
+            .zip(lms.weights)
+            .all(|(&history, weight)| {
+                let adjustment = if history < 0 { -delta } else { delta };
+                weight.checked_add(adjustment).is_some()
+            })
+    }
+
     pub fn new(channels: usize, scale_factor_bits: usize) -> Self {
         Self {
             channels,
@@ -52,6 +76,7 @@ impl EncoderBase {
         scalefactor: i32,
         lms: &mut SeaLMS,
         best_rank: u64, // provided as optimization, can be u64::MAX if omitted
+        include_lms_penalty: bool,
         residual_size: SeaResidualSize,
         scalefactor_reciprocals: &[i32],
         current_residuals: &mut [u8],
@@ -66,7 +91,9 @@ impl EncoderBase {
 
         for (index, sample_i16) in samples.iter().step_by(channels).enumerate() {
             let sample = *sample_i16 as i32;
-            let predicted = lms.predict();
+            let Some(predicted) = Self::lms_prediction(lms) else {
+                return u64::MAX;
+            };
             let residual = sample - predicted;
             let scaled = sea_div(
                 residual,
@@ -82,11 +109,17 @@ impl EncoderBase {
 
             let error_sq = error.pow(2) as u64;
 
-            current_rank += error_sq + lms.get_weights_penalty();
+            current_rank += error_sq;
+            if include_lms_penalty {
+                current_rank += lms.get_weights_penalty();
+            }
             if current_rank > best_rank {
                 break;
             }
 
+            if !Self::lms_update_is_safe(lms, dequantized) {
+                return u64::MAX;
+            }
             lms.update(reconstructed, dequantized);
             current_residuals[index] = quantized;
         }
@@ -104,6 +137,7 @@ impl EncoderBase {
         prev_scalefactor: i32, // provided as optimization, can be 0
         ref_lms: &SeaLMS,
         residual_size: SeaResidualSize,
+        include_lms_penalty: bool,
         best_residual_bits: &mut [u8],
         current_residuals: &mut [u8],
     ) -> (u64, SeaLMS, i32) {
@@ -130,6 +164,7 @@ impl EncoderBase {
                 scalefactor,
                 &mut current_lms,
                 best_rank,
+                include_lms_penalty,
                 residual_size,
                 scalefactor_reciprocals,
                 current_residuals,
@@ -154,6 +189,46 @@ impl EncoderBase {
         residuals: &mut [u8],
         ranks: &mut [u64],
     ) {
+        self.get_residuals_for_chunk_with_rank(
+            samples,
+            residual_size,
+            scale_factors,
+            residuals,
+            ranks,
+            true,
+        );
+    }
+
+    /// Uses decoded sample SSE alone when comparing scale-factor candidates.
+    /// This is appropriate for VBR rate-distortion decisions; CBR retains its
+    /// historical LMS-stability penalty through `get_residuals_for_chunk`.
+    pub fn get_residuals_for_chunk_exact_sse(
+        &mut self,
+        samples: &[i16],
+        residual_size: &[SeaResidualSize],
+        scale_factors: &mut [u8],
+        residuals: &mut [u8],
+        ranks: &mut [u64],
+    ) {
+        self.get_residuals_for_chunk_with_rank(
+            samples,
+            residual_size,
+            scale_factors,
+            residuals,
+            ranks,
+            false,
+        );
+    }
+
+    fn get_residuals_for_chunk_with_rank(
+        &mut self,
+        samples: &[i16],
+        residual_size: &[SeaResidualSize],
+        scale_factors: &mut [u8],
+        residuals: &mut [u8],
+        ranks: &mut [u64],
+        include_lms_penalty: bool,
+    ) {
         let mut best_residual_bits = mem::take(&mut self.best_residual_bits);
         best_residual_bits.resize(samples.len() / self.channels, 0);
 
@@ -177,6 +252,7 @@ impl EncoderBase {
                 self.prev_scalefactor[channel_offset],
                 &self.lms[channel_offset],
                 residual_size[channel_offset],
+                include_lms_penalty,
                 &mut best_residual_bits,
                 &mut current_residuals,
             );

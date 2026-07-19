@@ -1,9 +1,30 @@
 use helpers::{encode_decode, gen_test_signal, TEST_SAMPLE_RATE};
-use sea_codec::encoder::EncoderSettings;
+use sea_codec::{encoder::EncoderSettings, sea_decode, sea_encode};
 
 extern crate sea_codec;
 
 mod helpers;
+
+#[test]
+fn vbr_effort_levels_keep_the_legacy_chunk_format() {
+    let input = gen_test_signal(1, 40);
+
+    for vbr_residual_beam_width in [0, 1, 2, 3, 4] {
+        let encoded = sea_encode(
+            &input,
+            TEST_SAMPLE_RATE,
+            1,
+            EncoderSettings {
+                vbr: true,
+                vbr_residual_beam_width,
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(encoded[22], 0x02);
+        assert_eq!(sea_decode(&encoded).samples.len(), input.len());
+    }
+}
 
 #[test]
 fn test_sample_len() {

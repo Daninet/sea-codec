@@ -16,6 +16,11 @@
         display: flex;
         gap: 20px;
       }
+      @media (max-width: 768px) {
+        .container {
+          flex-direction: column;
+        }
+      }
       .column {
         flex: 1;
         border: 1px solid #ccc;
@@ -51,6 +56,18 @@
       select {
         padding: 5px;
       }
+      .vbr-target-row {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+      }
+      #vbr_target_bitrate {
+        flex: 1;
+        min-width: 0;
+      }
+      .vbr-target-row label {
+        margin: 0;
+      }
       button {
         padding: 8px 15px;
       }
@@ -63,7 +80,7 @@
   </head>
   <body>
     <h2>
-      SEA - Simple Embedded Audio Codec
+      SEA <span id="version"></span> - Simple Embedded Audio Codec
       <a href="https://github.com/Daninet/sea-codec" target="_blank">[GitHub]</a>
     </h2>
     <div class="container">
@@ -90,16 +107,28 @@
         </div>
         <div>
           VBR target bitrate:
-          <input
-            type="range"
-            min="1.5"
-            max="8"
-            value="3"
-            step="0.1"
-            id="vbr_target_bitrate"
-            disabled="disabled"
-          />
-          <label id="vbr_target_bitrate_label">3.0</label>
+          <div class="vbr-target-row">
+            <input
+              type="range"
+              min="1.5"
+              max="8"
+              value="3"
+              step="0.1"
+              id="vbr_target_bitrate"
+              disabled="disabled"
+            />
+            <label id="vbr_target_bitrate_label">3.0</label>
+          </div>
+        </div>
+        <div>
+          <label for="vbr_effort">VBR effort:</label>
+          <select id="vbr_effort" name="vbr_effort" disabled="disabled">
+            <option value="0" selected>Fast</option>
+            <option value="1">Low</option>
+            <option value="2">Medium</option>
+            <option value="3">High</option>
+            <option value="4">Ultra</option>
+          </select>
         </div>
         <div>
           <label for="sample_rate">Target Sample Rate:</label>

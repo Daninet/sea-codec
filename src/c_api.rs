@@ -12,6 +12,8 @@ pub struct CSeaEncoderSettings {
     pub residual_bits: c_float,
     pub frames_per_chunk: u16,
     pub vbr: bool,
+    /// VBR encoder effort: 0 = fast, 1 = low, 2 = mid, 3 = high, 4 = ultra.
+    pub vbr_effort: u8,
 }
 
 impl From<&CSeaEncoderSettings> for EncoderSettings {
@@ -22,6 +24,8 @@ impl From<&CSeaEncoderSettings> for EncoderSettings {
             residual_bits: c_settings.residual_bits,
             frames_per_chunk: c_settings.frames_per_chunk,
             vbr: c_settings.vbr,
+            vbr_residual_beam_width: c_settings.vbr_effort,
+            ..EncoderSettings::default()
         }
     }
 }
@@ -35,6 +39,7 @@ pub extern "C" fn sea_encoder_default_settings() -> CSeaEncoderSettings {
         residual_bits: default.residual_bits,
         frames_per_chunk: default.frames_per_chunk,
         vbr: default.vbr,
+        vbr_effort: default.vbr_residual_beam_width,
     }
 }
 
@@ -139,5 +144,25 @@ pub unsafe extern "C" fn sea_free_packet(data: *mut u8, length: usize) {
 pub unsafe extern "C" fn sea_free_samples(samples: *mut i16, length: usize) {
     if !samples.is_null() {
         let _ = Vec::from_raw_parts(samples, length, length);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vbr_effort_is_forwarded_to_encoder_settings() {
+        let c_settings = CSeaEncoderSettings {
+            scale_factor_bits: 4,
+            scale_factor_frames: 20,
+            residual_bits: 3.0,
+            frames_per_chunk: 5120,
+            vbr: true,
+            vbr_effort: 4,
+        };
+
+        let settings = EncoderSettings::from(&c_settings);
+        assert_eq!(settings.vbr_residual_beam_width, 4);
     }
 }

@@ -18,6 +18,9 @@ pub struct EncoderSettings {
     pub residual_bits: f32, // 1-8
     pub frames_per_chunk: u16,
     pub vbr: bool,
+    /// VBR encoder effort. Zero is the fast rate-allocation and scalar encoder;
+    /// one through six enable the higher-quality residual-path beam search.
+    pub vbr_residual_beam_width: u8,
 }
 
 impl Default for EncoderSettings {
@@ -28,6 +31,7 @@ impl Default for EncoderSettings {
             scale_factor_frames: 20,
             residual_bits: 3.0,
             vbr: false,
+            vbr_residual_beam_width: 0,
         }
     }
 }

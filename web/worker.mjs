@@ -26,7 +26,7 @@ let wasm;
   wasmExports.setup();
 
   wasm = {
-    wasm_sea_encode: (inputSamples, sampleRate, channels, quality, vbr) => {
+    wasm_sea_encode: (inputSamples, sampleRate, channels, quality, vbr, vbrEffort) => {
       if (!(inputSamples instanceof Int16Array))
         throw new Error("inputSamples should be Int16Array");
 
@@ -56,6 +56,7 @@ let wasm;
           channels,
           quality,
           vbr,
+          vbrEffort,
           wasmOutputBuffer,
           wasmOutputBufferSize
         );
@@ -190,7 +191,7 @@ let wasm;
   };
 
   // warm up JIT
-  const encodedData = wasm.wasm_sea_encode(new Int16Array(1024 * 1024), 44100, 1, 3, false);
+  const encodedData = wasm.wasm_sea_encode(new Int16Array(1024 * 1024), 44100, 1, 3, false, 0);
   wasm.wasm_sea_decode(encodedData);
 })();
 
@@ -224,9 +225,16 @@ let exports = {
     };
   },
 
-  async encodeSEA(interleavedSamples, sampleRate, channels, quality, vbr) {
+  async encodeSEA(interleavedSamples, sampleRate, channels, quality, vbr, vbrEffort) {
     const start = performance.now();
-    const encoded = wasm.wasm_sea_encode(interleavedSamples, sampleRate, channels, quality, vbr);
+    const encoded = wasm.wasm_sea_encode(
+      interleavedSamples,
+      sampleRate,
+      channels,
+      quality,
+      vbr,
+      vbrEffort
+    );
     const end = performance.now();
 
     return {

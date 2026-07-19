@@ -1,4 +1,7 @@
 import { downloadFile, formatNumber, readFile } from "./utils.mjs";
+import { SEA_VERSION } from "./version.mjs";
+
+document.getElementById("version").textContent = `v${SEA_VERSION}`;
 
 const worker = (() => {
   const w = new Worker("worker.mjs", {
@@ -37,6 +40,7 @@ const DOM_ENCODE_FILE = document.getElementById("encode_input");
 const DOM_RESIDUAL_SIZE = document.getElementById("residual_size");
 const DOM_VBR_TARGET_BITRATE = document.getElementById("vbr_target_bitrate");
 const DOM_VBR_TARGET_BITRATE_LABEL = document.getElementById("vbr_target_bitrate_label");
+const DOM_VBR_EFFORT = document.getElementById("vbr_effort");
 const DOM_SAMPLE_RATE = document.getElementById("sample_rate");
 const DOM_ENCODE_SUBMIT = document.getElementById("encode_submit");
 const DOM_ENCODE_RESULT = document.getElementById("encode_result");
@@ -47,7 +51,9 @@ const DOM_DECODE_SUBMIT = document.getElementById("decode_submit");
 const DOM_DECODE_RESULT = document.getElementById("decode_result");
 
 DOM_RESIDUAL_SIZE.addEventListener("input", () => {
-  DOM_VBR_TARGET_BITRATE.disabled = DOM_RESIDUAL_SIZE.value === "vbr" ? "" : "disabled";
+  const vbr = DOM_RESIDUAL_SIZE.value === "vbr";
+  DOM_VBR_TARGET_BITRATE.disabled = !vbr;
+  DOM_VBR_EFFORT.disabled = !vbr;
 });
 
 DOM_VBR_TARGET_BITRATE.addEventListener("input", () => {
@@ -93,13 +99,15 @@ DOM_ENCODE_SUBMIT.addEventListener("click", async () => {
   const residual_size = vbr
     ? parseFloat(DOM_VBR_TARGET_BITRATE.value)
     : parseInt(DOM_RESIDUAL_SIZE.value);
+  const vbrEffort = parseInt(DOM_VBR_EFFORT.value);
 
   const { encoded, duration: encodeDuration } = await worker.encodeSEA(
     processedSamples,
     targetSampleRate,
     channels,
     residual_size,
-    vbr
+    vbr,
+    vbrEffort
   );
 
   const {

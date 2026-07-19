@@ -6,6 +6,7 @@ mod dqt;
 mod encoder_base;
 mod encoder_cbr;
 mod encoder_vbr;
+mod encoder_vbr_beam;
 pub mod file;
 mod lms;
 mod qt;

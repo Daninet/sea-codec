@@ -15,6 +15,8 @@ typedef struct {
     float residual_bits;
     uint16_t frames_per_chunk;
     bool vbr;
+    // VBR encoder effort: 0 = fast, 1 = low, 2 = mid, 3 = high, 4 = ultra.
+    uint8_t vbr_effort;
 } CSeaEncoderSettings;
 
 // Helper to get default settings

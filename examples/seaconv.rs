@@ -70,6 +70,15 @@ fn get_encoder_settings(matches: &ArgMatches) -> EncoderSettings {
     }
 
     let vbr = matches.get_flag("vbr");
+    let vbr_residual_beam_width = match matches.get_one::<String>("vbr-effort").map(String::as_str)
+    {
+        None | Some("fast") => 0,
+        Some("low") => 1,
+        Some("mid") => 2,
+        Some("high") => 3,
+        Some("ultra") => 4,
+        Some(_) => unreachable!("clap validates --vbr-effort"),
+    };
 
     if vbr {
         if !(1.5..=8.0).contains(&residual_bits) {
@@ -88,6 +97,7 @@ fn get_encoder_settings(matches: &ArgMatches) -> EncoderSettings {
         scale_factor_frames,
         residual_bits,
         vbr,
+        vbr_residual_beam_width,
         frames_per_chunk,
         ..Default::default()
     }
@@ -142,6 +152,13 @@ fn main() {
                 .short('v')
                 .action(ArgAction::SetTrue)
                 .help("Enables Variable Bit Rate (VBR)"),
+        )
+        .arg(
+            Arg::new("vbr-effort")
+                .long("vbr-effort")
+                .value_parser(["fast", "low", "mid", "high", "ultra"])
+                .default_value("fast")
+                .help("VBR effort: fast=scalar; low=1, mid=2, high=3, ultra=4 beam paths"),
         )
         .arg(
             Arg::new("resample")

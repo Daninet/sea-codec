@@ -37,6 +37,7 @@ pub extern "C" fn wasm_sea_encode(
     channels: u32,
     bitrate: f32,
     vbr: bool,
+    vbr_effort: u8,
     output_buffer: *mut u8,
     output_length: usize,
 ) -> usize {
@@ -51,6 +52,7 @@ pub extern "C" fn wasm_sea_encode(
         EncoderSettings {
             residual_bits: bitrate,
             vbr,
+            vbr_residual_beam_width: vbr_effort,
             ..Default::default()
         },
     );

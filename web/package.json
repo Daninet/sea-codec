@@ -4,7 +4,7 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "build": "npx microbundle -i ./deps.js -f modern -o dist/deps.mjs"
+    "build": "node ./build.mjs && npx microbundle -i ./deps.js -f modern -o dist/deps.mjs"
   },
   "author": "",
   "license": "ISC",

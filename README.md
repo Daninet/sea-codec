@@ -44,6 +44,8 @@ Options:
           Sets the distance between scale factors in frames [default: 20]
   -v, --vbr
           Enables Variable Bit Rate (VBR)
+      --vbr-effort <fast|low|mid|high|ultra>
+          VBR encoder effort; `fast` is the default. Other options trade encoding time for quality.
   -r, --resample <resample>
           Sets the target sample rate for resampling
   -h, --help
@@ -138,4 +140,4 @@ struct SEA_CHUNK {
 
 MIT License
 
-Copyright (c) 2025 Dani Biró
+Copyright (c) 2025-2026 Dani Biró
